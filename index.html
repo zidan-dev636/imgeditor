@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Image Editor</title>
+<title>Image Editor By Den Zidans</title>
 <style>
   :root {
     --bg: #eaf7ff;
@@ -175,6 +175,9 @@
   .panel-draw { display: none; }
   .mode-draw .panel-draw { display: block; }
 
+  .bg-options { display:grid; gap:8px; margin-top:12px; }
+  .bg-choice { width:100%; }
+  .bg-choice[aria-pressed="true"] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
 </style>
 </head>
@@ -270,6 +273,22 @@
       </section>
 
       <section>
+        <h3>Background AI</h3>
+        <button class="btn primary" id="removeBgBtn" type="button" disabled style="width:100%">✂ Hapus background otomatis</button>
+        <p class="hint" id="bgStatus" role="status">Upload foto, lalu hapus background dengan AI.</p>
+        <div class="bg-options" id="bgOptions">
+          <button type="button" class="btn bg-choice" data-bg="transparent">Transparan</button>
+          <button type="button" class="btn bg-choice" data-bg="red">🔴 Merah</button>
+          <button type="button" class="btn bg-choice" data-bg="navy">🔵 Biru tua</button>
+          <label for="customBgColor">Warna custom</label>
+          <div class="brush-row"><input type="color" id="customBgColor" value="#7dd3fc"><button type="button" class="btn" id="applyCustomBg">Gunakan warna</button></div>
+          <label for="bgImageInput">Atau upload gambar background</label>
+          <input type="file" id="bgImageInput" accept="image/*" style="width:100%;font-size:12px" />
+        </div>
+        <p class="hint">Penghapusan AI memerlukan internet saat pertama kali memuat model. Foto diproses di browser.</p>
+      </section>
+
+      <section>
         <h3>Presets</h3>
         <div class="presets" id="presets"></div>
       </section>
@@ -306,6 +325,10 @@
   const brushSize = document.getElementById('brushSize');
   const brushSizeOut = document.getElementById('brushSizeOut');
 
+  const removeBgBtn = document.getElementById('removeBgBtn');
+  const bgStatus = document.getElementById('bgStatus');
+  let bgType = 'transparent', bgCustom = '#7dd3fc', bgImage = null, removingBg = false;
+  let imageGeneration = 0;
   const base = document.createElement('canvas');
   const bctx = base.getContext('2d');
 
@@ -420,12 +443,38 @@
     });
   }
 
+  function paintBackground(target, w, h) {
+    if (bgType === 'transparent') return;
+    target.save();
+    if (bgType === 'image' && bgImage) {
+      const scale = Math.max(w / bgImage.width, h / bgImage.height);
+      const dw = bgImage.width * scale, dh = bgImage.height * scale;
+      target.drawImage(bgImage, (w-dw)/2, (h-dh)/2, dw, dh);
+    } else {
+      target.fillStyle = bgType === 'red' ? '#e53935' : bgType === 'navy' ? '#102a56' : bgCustom;
+      target.fillRect(0, 0, w, h);
+    }
+    target.restore();
+  }
+
+  function syncBackground() {
+    document.querySelectorAll('[data-bg]').forEach(btn => btn.setAttribute('aria-pressed', String(btn.dataset.bg === bgType)));
+  }
+  function setBackground(type) {
+    if (!hasImage) return;
+    bgType = type;
+    syncBackground();
+    commit();
+    draw();
+  }
+
   function draw() {
     if (canvas.width !== base.width || canvas.height !== base.height) {
       canvas.width = base.width;
       canvas.height = base.height;
     }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    paintBackground(ctx, canvas.width, canvas.height);
     ctx.filter = comparing ? 'none' : filterString(filters, blurScaleFor(base.width));
     ctx.drawImage(base, 0, 0);
     ctx.filter = 'none';
@@ -492,7 +541,7 @@
   function commit() {
     if (!hasImage) return;
     history = history.slice(0, hIndex + 1);
-    history.push({ c: cloneCanvas(base), f: { ...filters } });
+    history.push({ c: cloneCanvas(base), f: { ...filters }, bgType, bgCustom, bgImage });
     if (history.length > HISTORY_LIMIT) history.shift();
     hIndex = history.length - 1;
     updateUI();
@@ -504,6 +553,8 @@
     hIndex = i;
     replaceBase(snap.c);
     filters = { ...snap.f };
+    bgType = snap.bgType || 'transparent'; bgCustom = snap.bgCustom || '#7dd3fc'; bgImage = snap.bgImage || null;
+    syncBackground();
     syncSliders();
     updateThumbs();
     updateUI();
@@ -525,6 +576,8 @@
     [compareBtn, downloadBtn, cropBtn, drawBtn, resetBtn].forEach(b => (b.disabled = !hasImage));
     document.querySelectorAll('[data-action]').forEach(b => (b.disabled = !hasImage));
     Object.values(sliderEls).forEach(({ input }) => (input.disabled = !hasImage));
+    removeBgBtn.disabled = !hasImage || removingBg;
+    document.querySelectorAll('.bg-options button, .bg-options input').forEach(el => el.disabled = !hasImage || removingBg);
     cropBtn.setAttribute('aria-pressed', String(mode === 'crop'));
     drawBtn.setAttribute('aria-pressed', String(mode === 'draw'));
     dims.textContent = hasImage ? `${base.width} × ${base.height}px` : 'No image';
@@ -543,6 +596,7 @@
   }
 
   function loadImageSource(img, name) {
+    imageGeneration++; bgType = 'transparent'; bgImage = null; syncBackground(); bgStatus.textContent = 'Siap menghapus background.';
     let w = img.naturalWidth || img.width;
     let h = img.naturalHeight || img.height;
     const s = Math.min(1, MAX_SIDE / Math.max(w, h));
@@ -667,6 +721,7 @@
     out.width = base.width;
     out.height = base.height;
     const o = out.getContext('2d');
+    paintBackground(o, out.width, out.height);
     o.filter = filterString(filters, blurScaleFor(base.width));
     o.drawImage(base, 0, 0);
     out.toBlob(blob => {
@@ -680,6 +735,48 @@
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }, 'image/png');
   }
+
+  document.querySelectorAll('[data-bg]').forEach(btn => btn.addEventListener('click', () => setBackground(btn.dataset.bg)));
+  document.getElementById('applyCustomBg').addEventListener('click', () => {
+    bgCustom = document.getElementById('customBgColor').value;
+    setBackground('custom');
+  });
+  document.getElementById('bgImageInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { bgImage = img; setBackground('image'); URL.revokeObjectURL(url); };
+    img.onerror = () => { bgStatus.textContent = 'Gagal membaca gambar background.'; URL.revokeObjectURL(url); };
+    img.src = url;
+    e.target.value = '';
+  });
+  removeBgBtn.addEventListener('click', async () => {
+    if (!hasImage || removingBg) return;
+    removingBg = true;
+    const generation = imageGeneration;
+    bgStatus.textContent = 'Memuat model AI dan memproses foto…';
+    updateUI();
+    try {
+      const { removeBackground } = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm');
+      const source = await new Promise((resolve, reject) => base.toBlob(b => b ? resolve(b) : reject(new Error('Gagal membaca foto')), 'image/png'));
+      const result = await removeBackground(source, { progress: (key, current, total) => {
+        if (generation === imageGeneration && total) bgStatus.textContent = `AI: ${Math.round(current / total * 100)}% (${key})`;
+      }});
+      if (generation !== imageGeneration) return;
+      const bitmap = await createImageBitmap(result);
+      if (generation !== imageGeneration) { bitmap.close(); return; }
+      base.width = bitmap.width; base.height = bitmap.height;
+      bctx.clearRect(0, 0, base.width, base.height);
+      bctx.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      bgStatus.textContent = 'Background berhasil dihapus. Pilih warna atau gambar pengganti.';
+      commit(); updateThumbs(); draw();
+    } catch (err) {
+      console.error('Background removal failed:', err);
+      bgStatus.textContent = 'Gagal menghapus background. Periksa koneksi internet dan coba lagi.';
+    } finally { removingBg = false; updateUI(); }
+  });
 
   canvas.addEventListener('pointerdown', e => {
     if (!hasImage || mode === 'move') return;
@@ -760,6 +857,7 @@
       const first = history[0];
       replaceBase(first.c);
       filters = { ...DEFAULTS };
+      bgType = 'transparent'; bgImage = null; syncBackground();
       syncSliders();
       mode = 'move';
       cropRect = null;
