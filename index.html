@@ -179,6 +179,12 @@
   .bg-options { display:grid; gap:8px; margin-top:12px; }
   .bg-choice { width:100%; }
   .bg-choice[aria-pressed="true"] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .session-panel { background:linear-gradient(135deg,#f0faff,#dff3ff); border-bottom:1px solid var(--border); }
+  .session-steps { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
+  .session-step { font-size:11px; padding:6px 8px; border-radius:20px; background:#fff; border:1px solid var(--border); color:var(--muted); }
+  .session-step.active { background:#38bdf8; color:#07334d; border-color:#38bdf8; font-weight:700; }
+  .session-actions { display:flex; gap:8px; }
+  .session-actions .btn { flex:1; }
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
 </style>
 </head>
@@ -229,6 +235,13 @@
     </div>
 
     <aside aria-label="Editing controls">
+      <section class="session-panel" id="sessionPanel">
+        <p class="hint" id="sessionHint" role="status">Mulai dengan upload foto, ya sayangg 💙</p>
+        <div class="session-actions" style="margin-top:12px">
+          <button class="btn" id="prevSessionBtn" type="button" disabled>← Sebelumnya</button>
+          <button class="btn primary" id="nextSessionBtn" type="button">Next Sesi →</button>
+        </div>
+      </section>
       <section>
         <h3>Tools</h3>
         <div class="tools">
@@ -331,6 +344,43 @@
 
   const removeBgBtn = document.getElementById('removeBgBtn');
   const bgStatus = document.getElementById('bgStatus');
+  const nextSessionBtn = document.getElementById('nextSessionBtn');
+  const prevSessionBtn = document.getElementById('prevSessionBtn');
+  const sessionHint = document.getElementById('sessionHint');
+  let session = 0;
+  let backgroundRemoved = false;
+  let backgroundSelected = false;
+  let exported = false;
+  const sessionNames = ['Upload foto', 'Hapus background AI', 'Pilih background', 'Export foto'];
+  function setSession(next) {
+    session = Math.max(0, Math.min(3, next));
+    document.querySelectorAll('[data-session]').forEach(el => el.classList.toggle('active', Number(el.dataset.session) === session));
+    prevSessionBtn.disabled = session === 0 || removingBg;
+    nextSessionBtn.disabled = !hasImage || removingBg;
+    nextSessionBtn.textContent = session === 3 ? (exported ? 'Foto Berikutnya →' : 'Export Foto →') : 'Next Sesi →';
+    sessionHint.textContent = session === 0 ? 'Upload foto untuk memulai.' :
+      session === 1 ? (backgroundRemoved ? 'Background sudah dihapus. Lanjut pilih background.' : 'Klik Hapus background otomatis untuk melanjutkan.') :
+      session === 2 ? (backgroundSelected ? 'Background sudah dipilih. Lanjut ke Export.' : 'Pilih background merah, biru tua, transparan, atau custom.') :
+      (exported ? 'Foto berhasil diekspor. Klik Foto Berikutnya untuk mulai lagi.' : 'Periksa hasil foto, lalu klik Export Foto.');
+  }
+  function goToControl(el) {
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    if (el.focus) el.focus({preventScroll:true});
+  }
+  nextSessionBtn.addEventListener('click', () => {
+    if (removingBg || !hasImage) return;
+    if (session === 0) {
+      setSession(1); goToControl(removeBgBtn);
+    } else if (session === 1) {
+      if (!backgroundRemoved) { goToControl(removeBgBtn); bgStatus.textContent = 'Hapus background dulu sebelum lanjut, ya sayangg 💙'; return; }
+      setSession(2); goToControl(document.getElementById('bgOptions'));
+    } else if (session === 2) {
+      if (!backgroundSelected) { goToControl(document.getElementById('bgOptions')); sessionHint.textContent = 'Pilih salah satu background dulu, ya sayangg 💙'; return; }
+      setSession(3); goToControl(downloadBtn);
+    } else if (!exported) { exportImage(); }
+    else { setSession(0); fileInput.click(); }
+  });
+  prevSessionBtn.addEventListener('click', () => { if (!removingBg) setSession(session-1); });
   let bgType = 'transparent', bgCustom = '#7dd3fc', bgImage = null, removingBg = false;
   let imageGeneration = 0;
   const base = document.createElement('canvas');
@@ -467,6 +517,8 @@
   function setBackground(type) {
     if (!hasImage) return;
     bgType = type;
+    backgroundSelected = true;
+    if (session === 2) setSession(2);
     syncBackground();
     commit();
     draw();
@@ -557,6 +609,7 @@
     hIndex = i;
     replaceBase(snap.c);
     filters = { ...snap.f };
+    backgroundSelected = snap.bgType !== 'transparent';
     bgType = snap.bgType || 'transparent'; bgCustom = snap.bgCustom || '#7dd3fc'; bgImage = snap.bgImage || null;
     syncBackground();
     syncSliders();
@@ -581,6 +634,8 @@
     document.querySelectorAll('[data-action]').forEach(b => (b.disabled = !hasImage));
     Object.values(sliderEls).forEach(({ input }) => (input.disabled = !hasImage));
     removeBgBtn.disabled = !hasImage || removingBg;
+    prevSessionBtn.disabled = session === 0 || removingBg;
+    nextSessionBtn.disabled = !hasImage || removingBg;
     document.querySelectorAll('.bg-options button, .bg-options input').forEach(el => el.disabled = !hasImage || removingBg);
     cropBtn.setAttribute('aria-pressed', String(mode === 'crop'));
     drawBtn.setAttribute('aria-pressed', String(mode === 'draw'));
@@ -600,6 +655,7 @@
   }
 
   function loadImageSource(img, name) {
+    backgroundRemoved = false; backgroundSelected = false; exported = false;
     imageGeneration++; bgType = 'transparent'; bgImage = null; syncBackground(); bgStatus.textContent = 'Siap menghapus background.';
     let w = img.naturalWidth || img.width;
     let h = img.naturalHeight || img.height;
@@ -620,6 +676,7 @@
     commit();
     updateThumbs();
     draw();
+    setSession(1);
   }
 
   function loadFile(file) {
@@ -730,6 +787,8 @@
     o.drawImage(base, 0, 0);
     out.toBlob(blob => {
       if (!blob) return;
+      exported = true;
+      setSession(3);
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `${fileName}-edited.png`;
@@ -774,12 +833,14 @@
       bctx.clearRect(0, 0, base.width, base.height);
       bctx.drawImage(bitmap, 0, 0);
       bitmap.close();
+      backgroundRemoved = true;
+      setSession(2);
       bgStatus.textContent = 'Background berhasil dihapus. Pilih warna atau gambar pengganti.';
       commit(); updateThumbs(); draw();
     } catch (err) {
       console.error('Background removal failed:', err);
       bgStatus.textContent = 'Gagal menghapus background. Periksa koneksi internet dan coba lagi.';
-    } finally { removingBg = false; updateUI(); }
+    } finally { removingBg = false; updateUI(); setSession(session); }
   });
 
   canvas.addEventListener('pointerdown', e => {
@@ -925,6 +986,7 @@
   });
 
   updateUI();
+  setSession(0);
 })();
 </script>
 </body>
