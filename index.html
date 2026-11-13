@@ -279,7 +279,7 @@
         <div class="bg-options" id="bgOptions">
           <button type="button" class="btn bg-choice" data-bg="transparent">Transparan</button>
           <button type="button" class="btn bg-choice" data-bg="red">🔴 Merah</button>
-          <button type="button" class="btn bg-choice" data-bg="navy">🔵 Biru tua</button>
+          <button type="button" class="btn bg-choice" data-bg="birutua">🔵 Biru tua</button>
           <label for="customBgColor">Warna custom</label>
           <div class="brush-row"><input type="color" id="customBgColor" value="#7dd3fc"><button type="button" class="btn" id="applyCustomBg">Gunakan warna</button></div>
           <label for="bgImageInput">Atau upload gambar background</label>
@@ -451,7 +451,7 @@
       const dw = bgImage.width * scale, dh = bgImage.height * scale;
       target.drawImage(bgImage, (w-dw)/2, (h-dh)/2, dw, dh);
     } else {
-      target.fillStyle = bgType === 'red' ? '#e53935' : bgType === 'navy' ? '#102a56' : bgCustom;
+      target.fillStyle = bgType === 'red' ? '#e53935' : bgType === 'birutua' ? '##0033CC' : bgCustom;
       target.fillRect(0, 0, w, h);
     }
     target.restore();
