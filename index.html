@@ -451,7 +451,7 @@
       const dw = bgImage.width * scale, dh = bgImage.height * scale;
       target.drawImage(bgImage, (w-dw)/2, (h-dh)/2, dw, dh);
     } else {
-      target.fillStyle = bgType === 'red' ? '#e53935' : bgType === 'birutua' ? '##0033CC' : bgCustom;
+      target.fillStyle = bgType === 'red' ? '#e53935' : bgType === 'birutua' ? '#0033CC' : bgCustom;
       target.fillRect(0, 0, w, h);
     }
     target.restore();
