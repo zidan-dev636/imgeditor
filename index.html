@@ -99,7 +99,7 @@
   }
   .has-image #canvas { display: block; }
   .has-image .empty { display: none; }
-  .mode-draw #canvas, .mode-crop #canvas { cursor: crosshair; }
+  .mode-draw #canvas, .mode-crop #canvas, .mode-fill #canvas { cursor: crosshair; }
 
   .empty {
     text-align: center;
@@ -172,9 +172,12 @@
   .hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
   .crop-actions { display: none; gap: 6px; margin-top: 10px; }
   .mode-crop .crop-actions { display: flex; }
+  .mode-fill .fill-actions { display:flex; }
+  .fill-actions { display:none; gap:6px; margin-top:10px; }
+  .fill-actions .btn { flex:1; }
   .crop-actions .btn { flex: 1; }
   .panel-draw { display: none; }
-  .mode-draw .panel-draw { display: block; }
+  .mode-draw .panel-draw, .mode-fill .panel-draw { display: block; }
 
   .bg-options { display:grid; gap:8px; margin-top:12px; }
   .bg-choice { width:100%; }
@@ -272,6 +275,7 @@
           <button class="btn icon" id="drawBtn" type="button" aria-label="Draw" title="Draw" aria-pressed="false" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg>
           </button>
+          <button class="btn" id="fillBtn" type="button" aria-label="Hapus objek" title="Coret objek menggunakan kuas lalu hapus dengan pengisian tekstur sekitar" aria-pressed="false" disabled>🧽 Hapus Objek</button>
           <button class="btn icon" id="resetBtn" type="button" aria-label="Reset all edits" title="Reset all edits" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
           </button>
@@ -280,17 +284,20 @@
           <button class="btn" id="cropCancel" type="button">Cancel</button>
           <button class="btn primary" id="cropApply" type="button">Apply crop</button>
         </div>
+        <div class="fill-actions"><button class="btn" id="fillCancel" type="button">Bersihkan Coretan</button><button class="btn primary" id="fillApply" type="button" disabled>Hapus Objek Terpilih</button></div>
+        <p class="hint" id="fillStatus" role="status">Hapus Objek: atur ukuran kuas, coret objek, lalu klik Hapus Objek Terpilih. Area diisi dengan tekstur sekitarnya.</p>
         <p class="hint" id="toolHint">Rotate, flip, crop or draw on your photo.</p>
       </section>
 
       <section class="panel-draw">
-        <h3>Brush</h3>
+        <h3>Kuas Gambar / Penghapus</h3>
+        <p class="hint" id="brushHint">Atur ukuran kuas untuk menggambar atau menandai objek yang akan dihapus.</p>
         <div class="brush-row">
           <label class="sr-only" for="brushColor">Brush color</label>
           <input type="color" id="brushColor" value="#38bdf8" />
           <div style="flex:1">
-            <div class="slider-head"><label for="brushSize">Size</label><output id="brushSizeOut">12px</output></div>
-            <input type="range" id="brushSize" min="1" max="80" value="12" />
+            <div class="slider-head"><label for="brushSize">Size</label><output id="brushSizeOut">24px</output></div>
+            <input type="range" id="brushSize" min="1" max="200" value="24" />
           </div>
         </div>
       </section>
@@ -356,6 +363,9 @@
   exportQuality.addEventListener('input', () => exportQualityValue.textContent = exportQuality.value + '%');
   const cropBtn = document.getElementById('cropBtn');
   const drawBtn = document.getElementById('drawBtn');
+  const fillBtn = document.getElementById('fillBtn');
+  const brushHint = document.getElementById('brushHint');
+  const fillStatus = document.getElementById('fillStatus');
   const resetBtn = document.getElementById('resetBtn');
   const brushColor = document.getElementById('brushColor');
   const brushSize = document.getElementById('brushSize');
@@ -576,6 +586,9 @@
       ctx.stroke();
       ctx.restore();
     }
+    if ((mode === 'fill') && eraseBounds && eraseMask.width === base.width) {
+      ctx.save(); ctx.globalAlpha = 0.55; ctx.drawImage(eraseMask,0,0); ctx.restore();
+    }
   }
 
   function updateThumbs() {
@@ -647,9 +660,10 @@
     app.classList.toggle('has-image', hasImage);
     app.classList.toggle('mode-draw', mode === 'draw');
     app.classList.toggle('mode-crop', mode === 'crop');
+    app.classList.toggle('mode-fill', mode === 'fill');
     undoBtn.disabled = !hasImage || hIndex <= 0;
     redoBtn.disabled = !hasImage || hIndex >= history.length - 1;
-    [compareBtn, downloadBtn, cropBtn, drawBtn, resetBtn].forEach(b => (b.disabled = !hasImage));
+    [compareBtn, downloadBtn, cropBtn, drawBtn, fillBtn, resetBtn].forEach(b => (b.disabled = !hasImage));
     document.querySelectorAll('[data-action]').forEach(b => (b.disabled = !hasImage));
     Object.values(sliderEls).forEach(({ input }) => (input.disabled = !hasImage));
     removeBgBtn.disabled = !hasImage || removingBg;
@@ -658,10 +672,13 @@
     document.querySelectorAll('.bg-options button, .bg-options input').forEach(el => el.disabled = !hasImage || removingBg);
     cropBtn.setAttribute('aria-pressed', String(mode === 'crop'));
     drawBtn.setAttribute('aria-pressed', String(mode === 'draw'));
+    brushHint.textContent = (mode === 'fill') ? 'Coret objek dengan kuas, lalu klik Hapus Objek Terpilih. Area tidak menjadi transparan.' : 'Atur ukuran kuas untuk menggambar.';
+    fillBtn.setAttribute('aria-pressed', String(mode === 'fill'));
     dims.textContent = hasImage ? `${base.width} × ${base.height}px` : 'No image';
-    modeLabel.textContent = 'Mode: ' + (mode === 'draw' ? 'Draw' : mode === 'crop' ? 'Crop' : 'Move');
+    modeLabel.textContent = 'Mode: ' + (mode === 'draw' ? 'Draw' : mode === 'crop' ? 'Crop' : mode === 'fill' ? 'Hapus Objek' : 'Move');
     toolHint.textContent =
       mode === 'crop' ? 'Drag on the image to select the area to keep.' :
+      mode === 'fill' ? 'Atur ukuran kuas, coret objek, kemudian klik Hapus Objek Terpilih.' :
       mode === 'draw' ? 'Draw directly on the photo. Strokes are added to history.' :
       'Rotate, flip, crop or draw on your photo.';
   }
@@ -669,11 +686,13 @@
   function setMode(next) {
     mode = mode === next ? 'move' : next;
     cropRect = null;
+    if (eraseBounds) clearEraseSelection();
     updateUI();
     render();
   }
 
   function loadImageSource(img, name) {
+    clearEraseSelection();
     backgroundRemoved = false; backgroundSelected = false; exported = false;
     imageGeneration++; bgType = 'transparent'; bgImage = null; syncBackground(); bgStatus.textContent = 'Siap menghapus background.';
     let w = img.naturalWidth || img.width;
@@ -796,6 +815,65 @@
     updateUI();
   }
 
+  function applyContentAwareFill(maskCanvas = null) {
+    if (!hasImage || !cropRect || cropRect.w < 3 || cropRect.h < 3) {
+      fillStatus.textContent = 'Seleksi area yang ingin dihilangkan terlebih dahulu.'; return;
+    }
+    const W = base.width, H = base.height;
+    const x = Math.max(0, Math.floor(cropRect.x)), y = Math.max(0, Math.floor(cropRect.y));
+    const w = Math.min(W-x, Math.ceil(cropRect.w)), h = Math.min(H-y, Math.ceil(cropRect.h));
+    if (w >= W * .85 || h >= H * .85) {
+      fillStatus.textContent = 'Area terlalu besar. Pilih objek yang lebih kecil.'; return;
+    }
+    // Cari patch dari sekitar area yang paling cocok dengan warna tepinya.
+    const src = bctx.getImageData(0, 0, W, H);
+    const data = src.data;
+    const maskPixels = maskCanvas ? maskCanvas.getContext('2d').getImageData(0,0,W,H).data : null;
+    const at = (px, py) => (py*W+px)*4;
+    const samples = [];
+    const step = Math.max(1, Math.floor(Math.min(w,h)/10));
+    for (let i=0; i<w; i+=step) {
+      if(y>0) samples.push([i,0,x+i,y-1]);
+      if(y+h<H) samples.push([i,h-1,x+i,y+h]);
+    }
+    for (let j=0; j<h; j+=step) {
+      if(x>0) samples.push([0,j,x-1,y+j]);
+      if(x+w<W) samples.push([w-1,j,x+w,y+j]);
+    }
+    if (!samples.length) { fillStatus.textContent='Tidak tersedia area referensi.'; return; }
+    const candidates=[];
+    const gap=Math.max(3,Math.round(Math.min(w,h)*.08));
+    const positions=[
+      [x-w-gap,y],[x+w+gap,y],[x,y-h-gap],[x,y+h+gap],
+      [x-w-gap,y-h-gap],[x+w+gap,y-h-gap],
+      [x-w-gap,y+h+gap],[x+w+gap,y+h+gap]
+    ];
+    for(const [sx,sy] of positions) {
+      if(sx<0||sy<0||sx+w>W||sy+h>H) continue;
+      let score=0;
+      for(const [dx,dy,tx,ty] of samples) {
+        const a=at(sx+dx,sy+dy), b=at(tx,ty);
+        for(let k=0;k<3;k++) score+=(data[a+k]-data[b+k])**2;
+      }
+      candidates.push({sx,sy,score});
+    }
+    if (!candidates.length) { fillStatus.textContent='Tidak ada tekstur di sekitar seleksi. Kecilkan area.'; return; }
+    candidates.sort((a,b)=>a.score-b.score);
+    const best=candidates[0];
+    const patch=bctx.getImageData(best.sx,best.sy,w,h);
+    const feather=Math.max(2,Math.min(24,Math.round(Math.min(w,h)*.12)));
+    for(let j=0;j<h;j++) for(let i=0;i<w;i++) {
+      const dst=at(x+i,y+j), from=(j*w+i)*4;
+      const edge=Math.min(i+1,j+1,w-i,h-j);
+      const alpha=maskPixels ? maskPixels[dst+3]/255 : Math.min(1,edge/feather);
+      for(let k=0;k<4;k++) data[dst+k]=Math.round(data[dst+k]*(1-alpha)+patch.data[from+k]*alpha);
+    }
+    bctx.putImageData(src,0,0);
+    cropRect=null; if (!maskCanvas) mode='move';
+    commit(); updateThumbs(); updateUI(); draw();
+    fillStatus.textContent='Area telah diisi dari tekstur sekitar. Gunakan Undo jika hasil kurang cocok.';
+  }
+
   function exportImage() {
     if (!hasImage) return;
     const format = exportFormat.value;
@@ -895,14 +973,37 @@
     } finally { removingBg = false; updateUI(); setSession(session); }
   });
 
+  const eraseMask = document.createElement('canvas');
+  const eraseCtx = eraseMask.getContext('2d');
+  let eraseBounds = null;
+  function clearEraseSelection() {
+    eraseBounds = null;
+    eraseCtx.clearRect(0,0,eraseMask.width,eraseMask.height);
+    document.getElementById('fillApply').disabled = true;
+    if (hasImage) render();
+  }
+  function markErase(p, prev = null) {
+    const r = Math.max(1, Number(brushSize.value)*displayScale()/2);
+    eraseCtx.save(); eraseCtx.fillStyle='#fff'; eraseCtx.strokeStyle='#fff'; eraseCtx.lineWidth=2*r; eraseCtx.lineCap='round'; eraseCtx.lineJoin='round';
+    if (prev) { eraseCtx.beginPath(); eraseCtx.moveTo(prev.x,prev.y); eraseCtx.lineTo(p.x,p.y); eraseCtx.stroke(); }
+    else { eraseCtx.beginPath(); eraseCtx.arc(p.x,p.y,r,0,Math.PI*2); eraseCtx.fill(); }
+    eraseCtx.restore();
+    document.getElementById('fillApply').disabled = false;
+    for(const pt of (prev ? [prev,p] : [p])) {
+      const b={x:Math.max(0,pt.x-r),y:Math.max(0,pt.y-r),right:Math.min(base.width,pt.x+r),bottom:Math.min(base.height,pt.y+r)};
+      eraseBounds=eraseBounds ? {x:Math.min(eraseBounds.x,b.x),y:Math.min(eraseBounds.y,b.y),right:Math.max(eraseBounds.right,b.right),bottom:Math.max(eraseBounds.bottom,b.bottom)} : b;
+    }
+  }
   canvas.addEventListener('pointerdown', e => {
     if (!hasImage || mode === 'move') return;
     canvas.setPointerCapture(e.pointerId);
     const p = toImagePoint(e);
-    if (mode === 'draw') {
+    if (mode === 'draw' || mode === 'fill') {
       drawing = true;
       lastPt = p;
+      if (mode === 'fill') { if (!eraseBounds || eraseMask.width !== base.width || eraseMask.height !== base.height) { eraseMask.width=base.width; eraseMask.height=base.height; } markErase(p); render(); return; }
       bctx.save();
+      bctx.globalCompositeOperation = 'source-over';
       bctx.fillStyle = brushColor.value;
       bctx.beginPath();
       bctx.arc(p.x, p.y, (brushSize.value * displayScale()) / 2, 0, Math.PI * 2);
@@ -916,9 +1017,11 @@
   });
 
   canvas.addEventListener('pointermove', e => {
-    if (mode === 'draw' && drawing) {
+    if ((mode === 'draw' || mode === 'fill') && drawing) {
       const p = toImagePoint(e);
+      if (mode === 'fill') { markErase(p,lastPt); lastPt=p; render(); return; }
       bctx.save();
+      bctx.globalCompositeOperation = 'source-over';
       bctx.strokeStyle = brushColor.value;
       bctx.lineWidth = brushSize.value * displayScale();
       bctx.lineCap = 'round';
@@ -946,8 +1049,8 @@
     if (drawing) {
       drawing = false;
       lastPt = null;
-      commit();
-      updateThumbs();
+      if (mode === 'fill') { fillStatus.textContent = 'Coretan ditandai. Tambahkan coretan bila perlu, lalu klik Hapus Objek Terpilih.'; draw(); }
+      else { commit(); updateThumbs(); }
     }
     cropStart = null;
   }
@@ -967,6 +1070,14 @@
   downloadBtn.addEventListener('click', exportImage);
   cropBtn.addEventListener('click', () => setMode('crop'));
   drawBtn.addEventListener('click', () => setMode('draw'));
+  fillBtn.addEventListener('click', () => setMode('fill'));
+  document.getElementById('fillApply').addEventListener('click', () => {
+    if (!eraseBounds || !hasImage) return;
+    const b = eraseBounds; cropRect = {x:Math.floor(b.x), y:Math.floor(b.y), w:Math.ceil(b.right-b.x), h:Math.ceil(b.bottom-b.y)};
+    applyContentAwareFill(eraseMask);
+    if (!cropRect) clearEraseSelection();
+  });
+  document.getElementById('fillCancel').addEventListener('click', () => {clearEraseSelection(); draw(); fillStatus.textContent='Coretan dibersihkan tanpa mengubah foto.';});
   document.getElementById('cropApply').addEventListener('click', applyCrop);
   document.getElementById('cropCancel').addEventListener('click', () => setMode('crop'));
   resetBtn.addEventListener('click', () => {
