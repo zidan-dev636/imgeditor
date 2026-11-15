@@ -203,6 +203,15 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
     </button>
     <button class="btn" id="compareBtn" type="button" title="Hold to see the image without adjustments" disabled>Hold to compare</button>
+    <label for="exportFormat" style="font-size:12px;font-weight:600">Format Export</label>
+    <select id="exportFormat" class="btn" aria-label="Pilih format export">
+      <option value="png">PNG</option>
+      <option value="jpeg">JPG / JPEG</option>
+      <option value="webp">WEBP</option>
+      <option value="svg">SVG</option>
+    </select>
+    <label for="exportQuality" id="exportQualityLabel" style="display:none;font-size:12px">Kualitas <span id="exportQualityValue">92%</span></label>
+    <input type="range" id="exportQuality" min="10" max="100" value="92" step="1" style="display:none;width:95px" aria-label="Kualitas export" />
     <button class="btn primary" id="downloadBtn" type="button" disabled>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
       Export
@@ -335,6 +344,16 @@
   const redoBtn = document.getElementById('redoBtn');
   const compareBtn = document.getElementById('compareBtn');
   const downloadBtn = document.getElementById('downloadBtn');
+  const exportFormat = document.getElementById('exportFormat');
+  const exportQuality = document.getElementById('exportQuality');
+  const exportQualityLabel = document.getElementById('exportQualityLabel');
+  const exportQualityValue = document.getElementById('exportQualityValue');
+  exportFormat.addEventListener('change', () => {
+    const show = exportFormat.value === 'jpeg' || exportFormat.value === 'webp';
+    exportQuality.style.display = show ? '' : 'none';
+    exportQualityLabel.style.display = show ? '' : 'none';
+  });
+  exportQuality.addEventListener('input', () => exportQualityValue.textContent = exportQuality.value + '%');
   const cropBtn = document.getElementById('cropBtn');
   const drawBtn = document.getElementById('drawBtn');
   const resetBtn = document.getElementById('resetBtn');
@@ -778,25 +797,58 @@
   }
 
   function exportImage() {
+    if (!hasImage) return;
+    const format = exportFormat.value;
+    const mime = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' }[format];
+    const quality = Number(exportQuality.value) / 100;
     const out = document.createElement('canvas');
     out.width = base.width;
     out.height = base.height;
     const o = out.getContext('2d');
-    paintBackground(o, out.width, out.height);
+    // JPEG tidak mendukung transparansi: gunakan latar putih jika transparan.
+    if (format === 'jpeg' && bgType === 'transparent') {
+      o.fillStyle = '#ffffff';
+      o.fillRect(0, 0, out.width, out.height);
+    } else {
+      paintBackground(o, out.width, out.height);
+    }
     o.filter = filterString(filters, blurScaleFor(base.width));
     o.drawImage(base, 0, 0);
-    out.toBlob(blob => {
-      if (!blob) return;
-      exported = true;
-      setSession(3);
+    o.filter = 'none';
+    if (format === 'svg') {
+      // Foto dan filter tetap raster; SVG membungkus gambar PNG agar hasil persis sama.
+      const pngData = out.toDataURL('image/png');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${out.width}" height="${out.height}" viewBox="0 0 ${out.width} ${out.height}"><image width="${out.width}" height="${out.height}" href="${pngData}"/></svg>`;
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${fileName}-edited.png`;
+      a.href = url;
+      a.download = `${fileName}-edited.svg`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    }, 'image/png');
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      exported = true;
+      setSession(3);
+      return;
+    }
+    out.toBlob(blob => {
+      if (!blob) { alert('Export gagal. Silakan coba lagi.'); return; }
+      if (blob.type !== mime) {
+        alert('Format ' + format.toUpperCase() + ' tidak didukung browser ini. Pilih format lain.');
+        return;
+      }
+      const a = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = `${fileName}-edited.${format === 'jpeg' ? 'jpg' : format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      exported = true;
+      setSession(3);
+    }, mime, format === 'png' ? undefined : quality);
   }
 
   document.querySelectorAll('[data-bg]').forEach(btn => btn.addEventListener('click', () => setBackground(btn.dataset.bg)));
