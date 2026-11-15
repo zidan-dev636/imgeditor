@@ -1,0 +1,57 @@
+
+body{background:#070413;color:#fff}
+
+#homePage{display:none;font-family:Inter,system-ui,-apple-system,sans-serif;color:#f8f6ff;min-height:100vh;background:radial-gradient(ellipse at 83% 15%,#5a123e 0%,transparent 38%),radial-gradient(ellipse at 8% 90%,#43112d 0%,transparent 35%),#080515;overflow:hidden;position:relative}
+#homePage{display:block}
+#homePage:before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.25;background-image:radial-gradient(#e7a4d4 1px,transparent 1px);background-size:12px 12px;mask-image:linear-gradient(90deg,transparent 38%,black 100%)}
+.home-shell{position:relative;z-index:1;max-width:1150px;margin:auto;padding:26px 28px 70px}
+.home-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 4px}
+.home-logo{font-size:21px;font-weight:800;letter-spacing:-.8px;display:flex;align-items:center;gap:10px}.home-logo-mark{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:conic-gradient(#ff5c70,#ba0bd8,#7036ff,#ff5c70);box-shadow:0 0 20px #f632b355}.home-logo-mark:after{content:"";width:13px;height:13px;background:#090617;border:3px solid white;border-radius:50%}
+.home-links{display:flex;gap:7px;align-items:center;border:1px solid #ffffff19;border-radius:30px;background:#ffffff0a;padding:5px}.home-links a{color:#b9b4cc;text-decoration:none;font-size:12px;padding:8px 15px;border-radius:20px}.home-links a:hover,.home-links a:first-child{background:#ffffff13;color:white}
+.home-outline{background:#ffffff0b;color:white;border:1px solid #ffffff36;border-radius:22px;padding:10px 18px;cursor:pointer}
+.home-hero{text-align:center;padding:92px 0 52px}.home-eyebrow{color:#dba3d5;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:700}.home-hero h1{font-size:clamp(36px,5.5vw,66px);line-height:1.14;letter-spacing:-2.5px;margin:19px auto;max-width:840px;font-weight:800}.home-gradient-text{background:linear-gradient(90deg,#a82af4,#ff387e,#ff7b5d);-webkit-background-clip:text;background-clip:text;color:transparent}.home-hero p{color:#b9b3c9;font-size:15px;max-width:550px;margin:0 auto 28px;line-height:1.8}.home-cta{display:inline-flex;align-items:center;gap:9px;border:0;border-radius:28px;background:linear-gradient(105deg,#8023e8,#d52e9d,#ff7853);color:#fff;font-weight:700;padding:15px 27px;cursor:pointer;box-shadow:0 10px 35px #bd22904a}.home-cta:hover{filter:brightness(1.12);transform:translateY(-1px)}
+.home-preview{max-width:880px;margin:0 auto;padding:17px;background:linear-gradient(135deg,#191438,#100c2b);border:1px solid #6c53867a;border-radius:24px;box-shadow:0 25px 85px #0009}.home-preview-inner{display:grid;grid-template-columns:minmax(0,1fr) 82px;gap:15px}.home-main-image{height:440px;position:relative;border-radius:15px;overflow:hidden;background:#282044}.home-main-image>img{width:100%;height:100%;object-fit:cover;object-position:center 38%}.home-edit-panel{position:absolute;bottom:17px;left:5%;right:5%;border-radius:13px;border:1px solid #ffffff55;background:#77769a78;backdrop-filter:blur(18px);padding:13px 18px}.home-edit-tabs{display:flex;justify-content:space-around;font-size:11px;color:#fff;margin-bottom:13px}.home-colorbar{height:8px;border-radius:20px;background:linear-gradient(90deg,#ddd,#7a40ef,#fd3a8c,#ffbd5b,#5fe1ec);position:relative}.home-colorbar:after{content:"";position:absolute;left:53%;top:50%;width:16px;height:16px;transform:translate(-50%,-50%);background:#1a1127;border:4px solid white;border-radius:50%}.home-thumbs{display:grid;gap:10px;grid-template-rows:repeat(4,1fr);min-height:0}.home-thumbs img{width:100%;height:100%;max-height:98px;object-fit:cover;border-radius:10px;border:1px solid #ffffff55}.home-thumbs img:nth-child(2){filter:sepia(.8) hue-rotate(315deg)}.home-thumbs img:nth-child(3){filter:hue-rotate(130deg) saturate(1.4)}.home-thumbs img:nth-child(4){filter:grayscale(1)}
+.home-section{text-align:center;padding:95px 0 25px}.home-section h2{font-size:clamp(26px,3vw,38px);letter-spacing:-1px;margin:0 0 13px}.home-section p{color:#aaa3bd;margin:0 auto;max-width:560px;line-height:1.7}.home-features{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:32px}.home-feature{background:linear-gradient(140deg,#221334,#110c2b);border:1px solid #6542676b;border-radius:19px;padding:27px;text-align:left;min-height:170px}.home-feature-icon{display:grid;place-items:center;width:43px;height:43px;border-radius:50%;background:linear-gradient(135deg,#8a1de4,#ff5570);font-size:20px;margin-bottom:20px}.home-feature h3{font-size:17px;margin:0 0 9px}.home-feature p{font-size:13px;color:#b2a9c1;line-height:1.6}.home-bottom{text-align:center;padding:70px 0 20px;color:#a79db8;font-size:12px}
+@media(max-width:700px){.home-shell{padding:16px 16px 50px}.home-links{display:none}.home-logo{font-size:17px}.home-outline{font-size:12px;padding:9px 12px}.home-hero{padding:72px 0 36px}.home-hero h1{letter-spacing:-1.3px}.home-preview{padding:9px;border-radius:17px}.home-preview-inner{grid-template-columns:minmax(0,1fr) 46px;gap:7px}.home-main-image{height:320px}.home-thumbs{gap:5px}.home-thumbs img{max-height:72px}.home-edit-panel{padding:9px;bottom:10px}.home-edit-tabs{font-size:8px}.home-features{grid-template-columns:1fr}.home-section{padding-top:75px}}
+
+
+/* Tema biru langit untuk beranda; fitur editor tetap utuh. */
+body{background:#eaf8ff;color:#123b58}
+#homePage{color:#123b58;background:radial-gradient(ellipse at 84% 14%,#a5e5ff 0%,transparent 42%),radial-gradient(ellipse at 8% 90%,#b7e9ff 0%,transparent 38%),linear-gradient(145deg,#f5fcff,#d7f2ff 55%,#eaf9ff)}
+#homePage:before{opacity:.35;background-image:radial-gradient(#62bde8 1px,transparent 1px)}
+.home-logo-mark{background:conic-gradient(#0ea5e9,#67e8f9,#2563eb,#0ea5e9);box-shadow:0 0 20px #38bdf855}
+.home-logo-mark:after{background:#e9f8ff;border-color:#fff}
+.home-links{border-color:#8bd0ef70;background:#ffffffa6}
+.home-links a{color:#467996}
+.home-links a:hover,.home-links a:first-child{background:#bceaff;color:#075985}
+.home-outline{background:#ffffffa8;color:#075985;border-color:#7dc9ed}
+.home-eyebrow{color:#0284c7}
+.home-gradient-text{background:linear-gradient(90deg,#075db4,#0ea5e9,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.home-hero p,.home-section p{color:#527c97}
+.home-cta{background:linear-gradient(105deg,#0369a1,#0ea5e9,#67d7f5);color:#fff;box-shadow:0 10px 35px #0ea5e94a}
+.home-preview{background:linear-gradient(135deg,#e7f8ff,#c5eaff);border-color:#83cbed;box-shadow:0 25px 65px #3689b32e}
+.home-main-image{background:#b3dff5}
+.home-edit-panel{background:#d5f2ff9e;border-color:#ffffffaa}
+.home-edit-tabs{color:#0c5278;font-weight:600}
+.home-colorbar{background:linear-gradient(90deg,#d8f5ff,#6ac9fa,#147ac6,#4dd8ee,#e5faff)}
+.home-colorbar:after{background:#075985}
+.home-thumbs img{border-color:#90d7f4}
+.home-feature{background:linear-gradient(140deg,#f7fdff,#d9f2ff);border-color:#a2d9f0;box-shadow:0 12px 30px #62b4db1c}
+.home-feature-icon{background:linear-gradient(135deg,#0284c7,#67d9f6);color:white}
+.home-feature p,.home-bottom{color:#56839e}
+.home-logo span[style]{color:#648ca5!important}
+
+.home-cta,.home-outline{text-decoration:none}.home-cta:visited{color:white}
+
+/* Baris sosial media - tema biru langit */
+.home-social-section{text-align:center;margin:76px auto 0;padding:42px 24px;max-width:1000px;border:1px solid #9bd8f2;border-radius:25px;background:linear-gradient(135deg,#ffffffdd,#d8f3ffdd);box-shadow:0 14px 44px #4aadd02a}
+.home-social-eyebrow{font-size:11px;letter-spacing:2px;color:#0284c7;font-weight:800}
+.home-social-section h2{font-size:clamp(25px,3vw,36px);margin:12px 0}
+.home-social-section p{color:#56839e;line-height:1.7}
+.home-social-list{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:26px}
+.home-social-link{display:inline-flex;align-items:center;gap:9px;text-decoration:none;font-weight:700;color:#075985;background:#f5fcff;border:1px solid #a0d8f2;padding:10px 17px;border-radius:30px;transition:transform .15s,background .15s,box-shadow .15s}
+.home-social-link:hover{transform:translateY(-3px);background:#d3efff;box-shadow:0 8px 20px #6fc3e655}
+.home-social-link:focus-visible{outline:3px solid #0284c7;outline-offset:3px}
+.home-social-symbol{display:grid;place-items:center;width:29px;height:29px;background:linear-gradient(135deg,#0284c7,#67d9f6);color:white;border-radius:50%;font-size:17px}
+.home-social-empty[hidden]{display:none}
+@media(max-width:700px){.home-social-section{margin-top:55px;padding:30px 15px}.home-social-link{padding:9px 13px}}

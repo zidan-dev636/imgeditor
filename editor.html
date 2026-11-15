@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="id">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Editor Foto | Den Zidan Studio</title>
+<link rel="stylesheet" href="editor.css">
+<link rel="icon" type="image/png" href="image/icon.png">
+</head>
+<body>
+<div class="app" id="app">
+  <header><a class="btn" href="index.html" style="text-decoration:none">← Beranda</a>
+    <div class="brand"><span class="brand-dot" aria-hidden="true"></span>Image Editor By Den Zidan</div>
+    <button class="btn" id="openBtn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Open
+    </button>
+    <button class="btn icon" id="undoBtn" type="button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <button class="btn icon" id="redoBtn" type="button" aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+    </button>
+    <button class="btn" id="compareBtn" type="button" title="Hold to see the image without adjustments" disabled>Hold to compare</button>
+    <label for="exportFormat" style="font-size:12px;font-weight:600">Format Export</label>
+    <select id="exportFormat" class="btn" aria-label="Pilih format export">
+      <option value="png">PNG</option>
+      <option value="jpeg">JPG / JPEG</option>
+      <option value="webp">WEBP</option>
+      <option value="svg">SVG</option>
+    </select>
+    <label for="exportQuality" id="exportQualityLabel" style="display:none;font-size:12px">Kualitas <span id="exportQualityValue">92%</span></label>
+    <input type="range" id="exportQuality" min="10" max="100" value="92" step="1" style="display:none;width:95px" aria-label="Kualitas export" />
+    <button class="btn primary" id="downloadBtn" type="button" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Export
+    </button>
+    <input type="file" id="fileInput" accept="image/*" class="sr-only" tabindex="-1" aria-hidden="true" />
+  </header>
+
+  <main>
+    <div class="stage-wrap">
+      <div class="stage" id="stage">
+        <div class="empty">
+          <div class="empty-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+          </div>
+          <h2>Upload a photo to start</h2>
+          <p>Drag and drop an image here, paste from your clipboard, or choose a file.</p>
+          <div class="row">
+            <button class="btn primary" id="emptyOpenBtn" type="button">Choose photo</button>
+            <button class="btn" id="sampleBtn" type="button">Use sample</button>
+          </div>
+        </div>
+        <canvas id="canvas" aria-label="Image being edited"></canvas>
+      </div>
+      <div class="statusbar" aria-live="polite">
+        <span id="dims">No image</span>
+        <span id="modeLabel">Mode: Move</span>
+        <span class="spacer"></span>
+        <span>Ctrl+Z undo · Ctrl+Shift+Z redo</span>
+      </div>
+    </div>
+
+    <aside aria-label="Editing controls">
+      <section class="session-panel" id="sessionPanel">
+        <p class="hint" id="sessionHint" role="status">Mulai dengan upload foto, ya sayangg 💙</p>
+        <div class="session-actions" style="margin-top:12px">
+          <button class="btn" id="prevSessionBtn" type="button" disabled>← Sebelumnya</button>
+          <button class="btn primary" id="nextSessionBtn" type="button">Next Sesi →</button>
+        </div>
+      </section>
+      <section>
+        <h3>Tools</h3>
+        <div class="tools">
+          <button class="btn icon" data-action="rotL" type="button" aria-label="Rotate left" title="Rotate left" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          </button>
+          <button class="btn icon" data-action="rotR" type="button" aria-label="Rotate right" title="Rotate right" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+          </button>
+          <button class="btn icon" data-action="flipH" type="button" aria-label="Flip horizontal" title="Flip horizontal" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v18"/><path d="M8 7 3 12l5 5V7z"/><path d="m16 7 5 5-5 5V7z"/></svg>
+          </button>
+          <button class="btn icon" data-action="flipV" type="button" aria-label="Flip vertical" title="Flip vertical" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h18"/><path d="M7 8l5-5 5 5H7z"/><path d="m7 16 5 5 5-5H7z"/></svg>
+          </button>
+          <button class="btn icon" id="cropBtn" type="button" aria-label="Crop" title="Crop" aria-pressed="false" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+          </button>
+          <button class="btn icon" id="drawBtn" type="button" aria-label="Draw" title="Draw" aria-pressed="false" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg>
+          </button>
+          <button class="btn" id="fillBtn" type="button" aria-label="Hapus objek" title="Coret objek menggunakan kuas lalu hapus dengan pengisian tekstur sekitar" aria-pressed="false" disabled>🧽 Hapus Objek</button>
+          <button class="btn icon" id="resetBtn" type="button" aria-label="Reset all edits" title="Reset all edits" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          </button>
+        </div>
+        <div class="crop-actions">
+          <button class="btn" id="cropCancel" type="button">Cancel</button>
+          <button class="btn primary" id="cropApply" type="button">Apply crop</button>
+        </div>
+        <div class="fill-actions"><button class="btn" id="fillCancel" type="button">Bersihkan Coretan</button><button class="btn primary" id="fillApply" type="button" disabled>Hapus Objek Terpilih</button></div>
+        <p class="hint" id="fillStatus" role="status">Hapus Objek: atur ukuran kuas, coret objek, lalu klik Hapus Objek Terpilih. Area diisi dengan tekstur sekitarnya.</p>
+        <p class="hint" id="toolHint">Rotate, flip, crop or draw on your photo.</p>
+      </section>
+
+      <section class="panel-draw">
+        <h3>Kuas Gambar / Penghapus</h3>
+        <p class="hint" id="brushHint">Atur ukuran kuas untuk menggambar atau menandai objek yang akan dihapus.</p>
+        <div class="brush-row">
+          <label class="sr-only" for="brushColor">Brush color</label>
+          <input type="color" id="brushColor" value="#38bdf8" />
+          <div style="flex:1">
+            <div class="slider-head"><label for="brushSize">Size</label><output id="brushSizeOut">24px</output></div>
+            <input type="range" id="brushSize" min="1" max="200" value="24" />
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3>Background AI</h3>
+        <button class="btn primary" id="removeBgBtn" type="button" disabled style="width:100%">✂ Hapus background otomatis</button>
+        <p class="hint" id="bgStatus" role="status">Upload foto, lalu hapus background dengan AI.</p>
+        <div class="bg-options" id="bgOptions">
+          <button type="button" class="btn bg-choice" data-bg="transparent">Transparan</button>
+          <button type="button" class="btn bg-choice" data-bg="red">🔴 Merah</button>
+          <button type="button" class="btn bg-choice" data-bg="birutua">🔵 Biru tua</button>
+          <p class="hint" style="text-align:center;color:#0284c7;font-weight:600;margin:2px 0 8px">Tekan hapus background dulu baru pilih background ya sayangg muachh 😘</p>
+          <label for="customBgColor">Warna custom</label>
+          <div class="brush-row"><input type="color" id="customBgColor" value="#7dd3fc"><button type="button" class="btn" id="applyCustomBg">Gunakan warna</button></div>
+          <label for="bgImageInput">Atau upload gambar background</label>
+          <input type="file" id="bgImageInput" accept="image/*" style="width:100%;font-size:12px" />
+        </div>
+        <p class="hint">Penghapusan AI memerlukan internet saat pertama kali memuat model. Foto diproses di browser.</p>
+      </section>
+
+      <section>
+        <h3>Presets</h3>
+        <div class="presets" id="presets"></div>
+      </section>
+
+      <section>
+        <h3>Adjust</h3>
+        <div id="sliders"></div>
+      </section>
+    </aside>
+  </main>
+</div>
+<div id="editorFooter" style="text-align: center; padding: 10px;">
+  &copy; 2026 Image Editor Made By Den Zidans with ❤️.
+</div>
+<script src="editor.js"></script>
+
+</body></html>
