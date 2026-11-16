@@ -21,6 +21,24 @@
   const compressQualityValue = document.getElementById('compressQualityValue');
   const compressTarget = document.getElementById('compressTarget');
   const compressStatus = document.getElementById('compressStatus');
+  const compressScale = document.getElementById('compressScale');
+  const compressAutoResize = document.getElementById('compressAutoResize');
+  const compressFormatHint = document.getElementById('compressFormatHint');
+  const compressQualityLabel = document.getElementById('compressQualityLabel');
+  function updateCompressFormat() {
+    const format = compressFormat.value;
+    const isPng = format === 'png';
+    compressQuality.disabled = isPng;
+    compressQualityLabel.style.opacity = isPng ? '0.55' : '1';
+    compressFormatHint.textContent = ({
+      webp: 'WEBP: ukuran kecil, kualitas tinggi, dan transparansi didukung.',
+      jpeg: 'JPG: bagus untuk foto; area transparan menjadi putih.',
+      png: 'PNG: kompresi lossless. Kualitas tidak dapat diatur; untuk mengecilkan file lebih lanjut, turunkan resolusi.',
+      svg: 'SVG: foto diedit tetap berupa gambar raster WEBP di dalam pembungkus SVG, bukan vektor asli.'
+    })[format];
+  }
+  compressFormat.addEventListener('change', updateCompressFormat);
+  updateCompressFormat();
   compressQuality.addEventListener('input', () => compressQualityValue.textContent = compressQuality.value + '%');
 
   const exportFormat = document.getElementById('exportFormat');
@@ -546,7 +564,7 @@
     fillStatus.textContent='Area telah diisi dari tekstur sekitar. Gunakan Undo jika hasil kurang cocok.';
   }
 
-  // Encode using the browser's native image encoder; no network upload.
+  // Encode locally in browser; no picture is uploaded to a server.
   function encodeCompressed(canvas, mime, quality) {
     return new Promise((resolve, reject) => canvas.toBlob(blob => {
       if (!blob || blob.type !== mime) reject(new Error('Format tidak didukung browser ini.'));
@@ -554,56 +572,120 @@
     }, mime, quality));
   }
 
+  function downloadCompressed(blob, ext) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fileName}-compressed.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  }
+
+  // Render a fresh output canvas at the requested output size, leaving the editor untouched.
+  function makeCompressCanvas(scale, format) {
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(base.width * scale));
+    out.height = Math.max(1, Math.round(base.height * scale));
+    const o = out.getContext('2d');
+    const flatten = format === 'jpeg';
+    if (flatten) { o.fillStyle = '#ffffff'; o.fillRect(0, 0, out.width, out.height); }
+    // Background colors and images must be drawn in scaled coordinates.
+    o.save();
+    o.scale(out.width / base.width, out.height / base.height);
+    paintBackground(o, base.width, base.height);
+    o.restore();
+    o.save();
+    o.scale(out.width / base.width, out.height / base.height);
+    o.filter = filterString(filters, blurScaleFor(base.width));
+    o.drawImage(base, 0, 0);
+    o.restore();
+    return out;
+  }
+
+  async function encodeAtQuality(canvas, format, quality) {
+    if (format === 'png') return encodeCompressed(canvas, 'image/png');
+    const embeddedFormat = format === 'svg' ? 'webp' : format;
+    const mime = embeddedFormat === 'jpeg' ? 'image/jpeg' : 'image/webp';
+    if (format !== 'svg') return encodeCompressed(canvas, mime, quality);
+    // This editor is raster-based. SVG stores a WEBP raster image, not editable vectors.
+    const raster = await encodeCompressed(canvas, mime, quality);
+    const dataUri = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Gagal membuat SVG.'));
+      reader.readAsDataURL(raster);
+    });
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}" viewBox="0 0 ${canvas.width} ${canvas.height}"><image width="${canvas.width}" height="${canvas.height}" href="${dataUri}"/></svg>`;
+    return new Blob([svg], {type:'image/svg+xml;charset=utf-8'});
+  }
+
+  async function findBestCompressed(canvas, format, topQuality, maxBytes) {
+    let blob = await encodeAtQuality(canvas, format, topQuality);
+    if (!maxBytes || blob.size <= maxBytes || format === 'png') return {blob, quality:topQuality};
+    // Try smaller encodings while keeping the maximum possible visual quality.
+    let best = null;
+    let low = 0.35, high = topQuality;
+    for (let i = 0; i < 10 && low <= high; i++) {
+      const q = (low + high) / 2;
+      const candidate = await encodeAtQuality(canvas, format, q);
+      if (candidate.size <= maxBytes) {
+        best = {blob:candidate, quality:q};
+        low = q + 0.003;
+      } else high = q - 0.003;
+    }
+    if (best) return best;
+    const minBlob = await encodeAtQuality(canvas, format, 0.35);
+    return minBlob.size < blob.size ? {blob:minBlob, quality:0.35} : {blob, quality:topQuality};
+  }
+
   async function compressImage() {
     if (!hasImage || compressBtn.disabled) return;
-    const mime = compressFormat.value === 'jpeg' ? 'image/jpeg' : 'image/webp';
-    const ext = compressFormat.value === 'jpeg' ? 'jpg' : 'webp';
-    const qualityMax = Number(compressQuality.value) / 100;
-    const targetKB = compressTarget.value.trim() ? Number(compressTarget.value) : null;
+    const format = compressFormat.value;
+    const ext = format === 'jpeg' ? 'jpg' : format;
+    const quality = Number(compressQuality.value) / 100;
+    const initialScale = Number(compressScale.value);
+    const rawTarget = compressTarget.value.trim();
+    const targetKB = rawTarget === '' ? null : Number(rawTarget);
     if (targetKB !== null && (!Number.isFinite(targetKB) || targetKB < 10)) {
-      compressStatus.textContent = 'Target minimal 10 KB.';
+      compressStatus.textContent = 'Target ukuran minimal 10 KB.';
       return;
     }
     compressBtn.disabled = true;
-    compressStatus.textContent = 'Mengompresi gambar…';
+    compressStatus.textContent = 'Sedang mengompresi gambar…';
     try {
-      const out = document.createElement('canvas');
-      out.width = base.width; out.height = base.height;
-      const o = out.getContext('2d');
-      // JPEG has no alpha channel; flatten transparent pixels to white.
-      if (mime === 'image/jpeg') { o.fillStyle = '#ffffff'; o.fillRect(0, 0, out.width, out.height); }
-      paintBackground(o, out.width, out.height);
-      o.filter = filterString(filters, blurScaleFor(base.width));
-      o.drawImage(base, 0, 0);
-      o.filter = 'none';
-      let blob = await encodeCompressed(out, mime, qualityMax);
-      const initialSize = blob.size;
       const targetBytes = targetKB === null ? null : targetKB * 1024;
-      if (targetBytes !== null && blob.size > targetBytes) {
-        let low = 0.45, high = qualityMax;
-        let best = null;
-        // Binary search for highest quality that meets the size target.
-        for (let i = 0; i < 9 && low <= high; i++) {
-          const q = (low + high) / 2;
-          const candidate = await encodeCompressed(out, mime, q);
-          if (candidate.size <= targetBytes) { best = candidate; low = q + 0.004; }
-          else { high = q - 0.004; }
+      let actualScale = initialScale;
+      let result = await findBestCompressed(makeCompressCanvas(actualScale, format), format, quality, targetBytes);
+      // Opt-in downscaling when native compression alone cannot reach the target.
+      if (targetBytes && result.blob.size > targetBytes && compressAutoResize.checked) {
+        let best = result;
+        let bestScale = actualScale;
+        for (const factor of [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2]) {
+          const scale = initialScale * factor;
+          const trial = await findBestCompressed(makeCompressCanvas(scale, format), format, quality, targetBytes);
+          if (trial.blob.size < best.blob.size || trial.blob.size <= targetBytes) {
+            best = trial; bestScale = scale;
+          }
+          if (trial.blob.size <= targetBytes) break;
         }
-        if (best) blob = best;
-        else blob = await encodeCompressed(out, mime, 0.45);
+        result = best;
+        actualScale = bestScale;
       }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `${fileName}-compressed.${ext}`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1500);
-      const fmt = n => n >= 1048576 ? (n/1048576).toFixed(2)+' MB' : (n/1024).toFixed(1)+' KB';
-      compressStatus.textContent = `Berhasil: ${fmt(blob.size)} (kualitas awal ${Math.round(qualityMax*100)}%).` +
-        (targetBytes !== null && blob.size > targetBytes ? ' Target belum tercapai; coba format WEBP atau target lebih besar.' : '') +
-        (targetBytes !== null && initialSize <= targetBytes ? ' Sudah memenuhi target pada kualitas maksimal.' : '');
+      downloadCompressed(result.blob, ext);
+      const formatSize = n => n >= 1048576 ? (n / 1048576).toFixed(2) + ' MB' : (n / 1024).toFixed(1) + ' KB';
+      const w = Math.max(1, Math.round(base.width * actualScale));
+      const h = Math.max(1, Math.round(base.height * actualScale));
+      compressStatus.textContent = `Berhasil: ${formatSize(result.blob.size)} • ${w}×${h} px` +
+        (format === 'png' ? ' • PNG lossless' : ` • kualitas ~${Math.round(result.quality * 100)}%`) +
+        (targetBytes && result.blob.size > targetBytes ? ' • Target KB belum tercapai. Coba resolusi lebih kecil atau format WEBP.' : '') +
+        (format === 'svg' ? ' • SVG berisi raster WEBP, bukan vektor.' : '');
     } catch (err) {
       compressStatus.textContent = 'Kompresi gagal: ' + err.message;
-    } finally { compressBtn.disabled = !hasImage; }
+    } finally {
+      compressBtn.disabled = !hasImage;
+    }
   }
 
   function exportImage() {

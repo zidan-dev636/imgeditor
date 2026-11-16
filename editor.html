@@ -137,13 +137,22 @@
         <h3>Compress Gambar</h3>
         <p class="hint">Perkecil ukuran file tanpa mengubah hasil edit. Kompresi hanya diterapkan pada file yang diunduh.</p>
         <label for="compressFormat">Format kompresi</label>
-        <select id="compressFormat" class="compress-input"><option value="webp">WEBP (disarankan)</option><option value="jpeg">JPG / JPEG</option></select>
-        <label for="compressQuality">Kualitas maksimal: <output id="compressQualityValue">90%</output></label>
-        <input type="range" id="compressQuality" min="60" max="100" value="90" step="1" />
+        <select id="compressFormat" class="compress-input">
+          <option value="webp">WEBP (disarankan)</option>
+          <option value="jpeg">JPG / JPEG</option>
+          <option value="png">PNG (lossless / transparansi)</option>
+          <option value="svg">SVG (gambar raster dalam SVG)</option>
+        </select>
+        <label for="compressQuality" id="compressQualityLabel">Kualitas maksimal: <output id="compressQualityValue">90%</output></label>
+        <input type="range" id="compressQuality" min="45" max="100" value="90" step="1" />
+        <p class="hint" id="compressFormatHint">WEBP umumnya paling efisien untuk foto dan mendukung transparansi.</p>
+        <label for="compressScale">Resolusi output</label>
+        <select id="compressScale" class="compress-input"><option value="1">100% (ukuran asli)</option><option value="0.85">85%</option><option value="0.7">70%</option><option value="0.5">50%</option></select>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal"><input id="compressAutoResize" type="checkbox" /> Kurangi resolusi otomatis jika target KB belum tercapai</label>
         <label for="compressTarget">Target ukuran file (KB, opsional)</label>
         <input type="number" id="compressTarget" class="compress-input" min="10" max="100000" placeholder="Contoh: 500" />
         <button class="btn primary" id="compressBtn" type="button" disabled style="width:100%;margin-top:10px">Compress & Download</button>
-        <p class="hint" id="compressStatus" role="status">Upload foto untuk mulai kompresi.</p>
+        <p class="hint" id="compressStatus" role="status" aria-live="polite">Upload foto untuk mulai kompresi.</p>
       </section>
       <section>
         <h3>Presets</h3>
