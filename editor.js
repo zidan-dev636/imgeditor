@@ -15,6 +15,14 @@
   const redoBtn = document.getElementById('redoBtn');
   const compareBtn = document.getElementById('compareBtn');
   const downloadBtn = document.getElementById('downloadBtn');
+  const compressBtn = document.getElementById('compressBtn');
+  const compressFormat = document.getElementById('compressFormat');
+  const compressQuality = document.getElementById('compressQuality');
+  const compressQualityValue = document.getElementById('compressQualityValue');
+  const compressTarget = document.getElementById('compressTarget');
+  const compressStatus = document.getElementById('compressStatus');
+  compressQuality.addEventListener('input', () => compressQualityValue.textContent = compressQuality.value + '%');
+
   const exportFormat = document.getElementById('exportFormat');
   const exportQuality = document.getElementById('exportQuality');
   const exportQualityLabel = document.getElementById('exportQualityLabel');
@@ -327,7 +335,7 @@
     app.classList.toggle('mode-fill', mode === 'fill');
     undoBtn.disabled = !hasImage || hIndex <= 0;
     redoBtn.disabled = !hasImage || hIndex >= history.length - 1;
-    [compareBtn, downloadBtn, cropBtn, drawBtn, fillBtn, resetBtn].forEach(b => (b.disabled = !hasImage));
+    [compareBtn, downloadBtn, compressBtn, cropBtn, drawBtn, fillBtn, resetBtn].forEach(b => (b.disabled = !hasImage));
     document.querySelectorAll('[data-action]').forEach(b => (b.disabled = !hasImage));
     Object.values(sliderEls).forEach(({ input }) => (input.disabled = !hasImage));
     removeBgBtn.disabled = !hasImage || removingBg;
@@ -538,6 +546,66 @@
     fillStatus.textContent='Area telah diisi dari tekstur sekitar. Gunakan Undo jika hasil kurang cocok.';
   }
 
+  // Encode using the browser's native image encoder; no network upload.
+  function encodeCompressed(canvas, mime, quality) {
+    return new Promise((resolve, reject) => canvas.toBlob(blob => {
+      if (!blob || blob.type !== mime) reject(new Error('Format tidak didukung browser ini.'));
+      else resolve(blob);
+    }, mime, quality));
+  }
+
+  async function compressImage() {
+    if (!hasImage || compressBtn.disabled) return;
+    const mime = compressFormat.value === 'jpeg' ? 'image/jpeg' : 'image/webp';
+    const ext = compressFormat.value === 'jpeg' ? 'jpg' : 'webp';
+    const qualityMax = Number(compressQuality.value) / 100;
+    const targetKB = compressTarget.value.trim() ? Number(compressTarget.value) : null;
+    if (targetKB !== null && (!Number.isFinite(targetKB) || targetKB < 10)) {
+      compressStatus.textContent = 'Target minimal 10 KB.';
+      return;
+    }
+    compressBtn.disabled = true;
+    compressStatus.textContent = 'Mengompresi gambar…';
+    try {
+      const out = document.createElement('canvas');
+      out.width = base.width; out.height = base.height;
+      const o = out.getContext('2d');
+      // JPEG has no alpha channel; flatten transparent pixels to white.
+      if (mime === 'image/jpeg') { o.fillStyle = '#ffffff'; o.fillRect(0, 0, out.width, out.height); }
+      paintBackground(o, out.width, out.height);
+      o.filter = filterString(filters, blurScaleFor(base.width));
+      o.drawImage(base, 0, 0);
+      o.filter = 'none';
+      let blob = await encodeCompressed(out, mime, qualityMax);
+      const initialSize = blob.size;
+      const targetBytes = targetKB === null ? null : targetKB * 1024;
+      if (targetBytes !== null && blob.size > targetBytes) {
+        let low = 0.45, high = qualityMax;
+        let best = null;
+        // Binary search for highest quality that meets the size target.
+        for (let i = 0; i < 9 && low <= high; i++) {
+          const q = (low + high) / 2;
+          const candidate = await encodeCompressed(out, mime, q);
+          if (candidate.size <= targetBytes) { best = candidate; low = q + 0.004; }
+          else { high = q - 0.004; }
+        }
+        if (best) blob = best;
+        else blob = await encodeCompressed(out, mime, 0.45);
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${fileName}-compressed.${ext}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      const fmt = n => n >= 1048576 ? (n/1048576).toFixed(2)+' MB' : (n/1024).toFixed(1)+' KB';
+      compressStatus.textContent = `Berhasil: ${fmt(blob.size)} (kualitas awal ${Math.round(qualityMax*100)}%).` +
+        (targetBytes !== null && blob.size > targetBytes ? ' Target belum tercapai; coba format WEBP atau target lebih besar.' : '') +
+        (targetBytes !== null && initialSize <= targetBytes ? ' Sudah memenuhi target pada kualitas maksimal.' : '');
+    } catch (err) {
+      compressStatus.textContent = 'Kompresi gagal: ' + err.message;
+    } finally { compressBtn.disabled = !hasImage; }
+  }
+
   function exportImage() {
     if (!hasImage) return;
     const format = exportFormat.value;
@@ -732,6 +800,7 @@
   undoBtn.addEventListener('click', () => hIndex > 0 && restore(hIndex - 1));
   redoBtn.addEventListener('click', () => hIndex < history.length - 1 && restore(hIndex + 1));
   downloadBtn.addEventListener('click', exportImage);
+  compressBtn.addEventListener('click', compressImage);
   cropBtn.addEventListener('click', () => setMode('crop'));
   drawBtn.addEventListener('click', () => setMode('draw'));
   fillBtn.addEventListener('click', () => setMode('fill'));
